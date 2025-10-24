@@ -91,17 +91,30 @@ image2avif <图片文件>
 - 对于大量文件转换，可以分批进行，避免占用过多系统资源
 - 质量参数设置为80通常是一个很好的平衡点，提供良好的压缩率和图像质量
 
-## 问题解决
-
-### 常见错误
-2. **转换失败**
-   - 检查输入文件是否存在且格式正确
-   - 确保有足够的磁盘空间
-   - 尝试使用较低的质量参数
-
 ## 编译使用
 
 要用到cgo，请确保已安装gcc和libavif库。
+
+### MACOS
+
+```bash
+brew install libavif aom
+```
+### Debian/Ubuntu (使用 apt):
+
+```bash
+apt-get install libavif-dev libaom-dev
+```
+
+### Windows 请使用
+
+[MSYS2](https://www.msys2.org/)
+
+```bash
+pacman -Syu
+pacman -S mingw-w64-x86_64-libavif mingw-w64-x86_64-aom
+go build
+```
 
 ## 许可证
 
