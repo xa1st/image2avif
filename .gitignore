@@ -1,4 +1,2 @@
 go.sum
-*.exe
-*.syso
-versioninfo.json
+./res
