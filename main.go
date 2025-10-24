@@ -12,16 +12,18 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Kagami/go-avif"
 	"github.com/chai2010/webp"
 	"golang.org/x/image/bmp"
 )
 
-const version = "1.0.0" // 应用版本号
+const version = "1.1.0" // 应用版本号
 
 var (
 	qualite     int  // 图像质量
+	forceFlag   bool // 新增：强制覆盖标志
 	help        bool // 帮助标志
 	versionFlag bool // 版本标志
 )
@@ -39,6 +41,7 @@ var supportedFormats = map[string]bool{
 // 初始化命令行标志
 func init() {
 	flag.IntVar(&qualite, "q", 80, "设置AVIF图像质量 (1-100)")
+	flag.BoolVar(&forceFlag, "f", false, "强制覆盖已存在的AVIF文件")
 	flag.BoolVar(&help, "h", false, "显示帮助令牌")
 	flag.BoolVar(&versionFlag, "v", false, "显示版本信息")
 }
@@ -63,8 +66,18 @@ func main() {
 	}
 	// 获取输入文件列表
 	inputFiles := flag.Args()
+	// 展开通配符
+	expandedFiles, err := expandWildcards(inputFiles)
+	if err != nil {
+		fmt.Printf("解析文件列表时出错: %v\n", err)
+		return
+	}
+	if len(expandedFiles) == 0 {
+		fmt.Println("未找到匹配的输入文件。")
+		return
+	}
 	// 处理每个输入文件
-	processFiles(inputFiles, qualite)
+	processFiles(expandedFiles, qualite)
 }
 
 // 处理输入的文件列表
@@ -79,7 +92,10 @@ func processFiles(files []string, quality int) {
 	successCount := 0
 	// 失败转换数
 	failCount := 0
+	// 显示开始信息
 	fmt.Printf("开始转换 %d 个文件，质量: %d\n", len(files), quality)
+	// 记录开始转换时间
+	startTime := time.Now()
 	// 遍历每个文件
 	for _, file := range files {
 		// 检查文件是否存在
@@ -98,9 +114,14 @@ func processFiles(files []string, quality int) {
 		// 检查转换过的AVIF文件是否已存在
 		outputPath := getOutputPath(file)
 		if fileExists(outputPath) {
-			fmt.Printf("AVIF文件已存在，跳过: %s\n", outputPath)
-			failCount++
-			continue
+			if forceFlag {
+				fmt.Printf("AVIF文件已存在，强制覆盖: %s\n", outputPath)
+				// 继续执行转换流程
+			} else {
+				fmt.Printf("AVIF文件已存在，跳过: %s\n", outputPath)
+				failCount++
+				continue
+			}
 		}
 		// 限制并发数
 		sem <- true
@@ -124,12 +145,47 @@ func processFiles(files []string, quality int) {
 	}
 	// 等待所有任务完成
 	wg.Wait()
+	// 记录结束时间
+	endTime := time.Now()
 	// 显示总结
 	fmt.Println()
-	fmt.Println("转换完成:")
-	fmt.Printf("成功: %d 个文件\n", successCount)
-	fmt.Printf("失败: %d 个文件\n", failCount)
-	fmt.Printf("总计: %d 个文件\n", resultCount)
+	fmt.Printf("转换完成:本次转换共处理 %d 个文件，成功 %d 个，失败 %d 个，总耗时 %s 。\n", resultCount, successCount, failCount, endTime.Sub(startTime).String())
+}
+
+// expandWildcards 函数用于展开文件路径中的通配符模式，返回匹配的所有文件路径
+// 参数 patterns: 包含文件路径模式的字符串切片，支持通配符 * ? []
+// 返回值 []string: 匹配到的所有文件路径，去重后的结果
+// 返回值 error: 错误信息，目前始终返回nil
+func expandWildcards(patterns []string) ([]string, error) {
+	var files []string
+	seen := make(map[string]bool)
+
+	for _, pattern := range patterns {
+		// 检查模式是否包含通配符
+		if strings.ContainsAny(pattern, "*?[]") {
+			// 使用 filepath.Glob 查找匹配的文件
+			matches, err := filepath.Glob(pattern)
+			if err != nil {
+				// 忽略无效的通配符，但打印警告
+				fmt.Printf("警告: 无效的文件模式 '%s': %v\n", pattern, err)
+				continue
+			}
+			// 遍历匹配结果，去重后添加到文件列表
+			for _, match := range matches {
+				if !seen[match] {
+					files = append(files, match)
+					seen[match] = true
+				}
+			}
+		} else {
+			// 如果不是通配符，直接添加到列表
+			if !seen[pattern] {
+				files = append(files, pattern)
+				seen[pattern] = true
+			}
+		}
+	}
+	return files, nil
 }
 
 func convertToAVIF(inputPath, outputPath string, quality int) error {
@@ -272,14 +328,14 @@ func fileExists(path string) bool {
 func showHelp() {
 	fmt.Println("图片转AVIF格式工具")
 	fmt.Printf("当前版本:%s，作者:猫东东 <https://bsay.de>\n", version)
-	fmt.Println("用于将任意的图片文件转换成avif,从而实现图片的压缩功能。\n")
-	fmt.Println("用于将任意的图片文件转换成avif,从而实现图片的压缩功能。\n")
+	fmt.Println("用于将任意的图片文件转换成avif,从而实现图片的压缩功能。")
 	fmt.Println()
 	fmt.Println("用法:")
-	fmt.Println("  image2avif.bat [选项] <文件...>")
+	fmt.Println("  image2avif [选项] <文件...>")
 	fmt.Println()
 	fmt.Println("选项:")
 	fmt.Println("  -q <数值>    设置AVIF质量 (1-100, 默认: 80)")
+	fmt.Println("  -f           强制覆盖已存在的AVIF文件")
 	fmt.Println("  -v           显示版本信息")
 	fmt.Println("  -h           显示帮助信息")
 	fmt.Println()
