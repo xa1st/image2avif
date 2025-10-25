@@ -17,21 +17,6 @@ jobs:
             goos: windows
             goarch: amd64
             suffix: .exe
-          - os: ubuntu-latest
-            target: linux-amd64
-            goos: linux
-            goarch: amd64
-            suffix: ''
-          - os: macos-latest
-            target: macos-amd64
-            goos: darwin
-            goarch: amd64
-            suffix: ''
-          - os: macos-latest
-            target: macos-arm64
-            goos: darwin
-            goarch: arm64
-            suffix: ''
 
     steps:
       - name: Checkout code
@@ -49,24 +34,6 @@ jobs:
       # --------------------------
       # 安装系统依赖（补充 libaom 等核心库）
       # --------------------------
-      
-      # Linux 系统：安装 libwebp + libavif + libaom（avif 依赖的编码库）
-      - name: Install dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          # 安装 libwebp
-          sudo apt-get install -y libwebp-dev
-          # 安装 libavif 及其依赖的编码库（libaom 是核心）
-          sudo apt-get install -y libavif-dev libavifenc-dev libavifdec-dev libaom-dev
-
-      # macOS 系统：通过 brew 安装（brew 会自动安装 libavif 的依赖）
-      - name: Install dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install webp
-          # 安装 libavif（brew 会自动拉取 libaom 等依赖）
-          brew install libavif
 
       # Windows 系统：通过 choco 安装 libaom（libavif 的依赖）
       - name: Install dependencies (Windows)
@@ -88,7 +55,7 @@ jobs:
       # --------------------------
       - name: Build (with Cgo)
         run: |
-          $outputName = "myapp-${{ github.ref_name }}-${{ matrix.target }}${{ matrix.suffix }}"
+          $outputName = "image2avif-${{ github.ref_name }}-${{ matrix.target }}${{ matrix.suffix }}"
           $env:CGO_ENABLED = "1"
           $env:GOOS = "${{ matrix.goos }}"
           $env:GOARCH = "${{ matrix.goarch }}"
