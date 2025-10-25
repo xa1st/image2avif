@@ -1,88 +1,96 @@
-name: Build with AVIF/WebP (Cgo)
+name: Windows Build with MSYS2 (Cgo)
 
+# 触发条件：推送以 v 开头的 Tag 时触发（如 v1.0.0）
 on:
   push:
     tags:
       - 'v*'
 
 jobs:
-  build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            target: windows-amd64
-            goos: windows
-            goarch: amd64
-            suffix: .exe
+  build-windows:
+    name: Build Windows (amd64) with MSYS2
+    runs-on: windows-latest  # 使用 Windows 环境
 
     steps:
+      # 步骤 1：拉取代码
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 步骤 2：安装 MSYS2 环境和依赖
+      - name: Set up MSYS2 and Dependencies
+        uses: msys2/setup-msys2@v2
+        with:
+          # 更新 MSYS2 包索引
+          update: true
+          # 安装所需工具链和依赖（请确认 'image2avif' 应用所需的库是否完整）
+          # 注意：移除了 mingw-w64-x86_64-go，推荐使用 actions/setup-go 设置 Go 环境
+          pacman: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-libwebp
+            mingw-w64-x86_64-libavif
+            mingw-w64-x86_64-libaom
+            mingw-w64-x86_64-zip  # 用于打包
+          # 使用 MSYS2 的 bash 作为默认 shell
+          shell: msys2 {0}
+          # 如果你的 Cgo 代码需要链接特定的库路径，可以设置 path-type
+          # path-type: strict
+
+      # 【可选】步骤 2.5：设置 Go 环境（推荐使用官方 Action，版本可控）
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
-          cache: true
+          go-version: 'stable' # 替换为你需要的 Go 版本
+        # 注意：这里我们不指定 shell: msys2 {0}，让 Go 在标准 Windows 环境中安装，
+        # 编译时再通过 shell: msys2 {0} 调用
 
-      - name: Download dependencies
-        run: go mod download
-
-      # --------------------------
-      # 安装系统依赖（补充 libaom 等核心库）
-      # --------------------------
-
-      # Windows 系统：通过 choco 安装 libaom（libavif 的依赖）
-      - name: Install dependencies (Windows)
-        if: matrix.os == 'windows-latest'
+      # 步骤 3：下载 Go 依赖（确保 go.sum 完整）
+      - name: Download Go dependencies
         run: |
-          # 安装 vcpkg（C++ 包管理器）
-          git clone https://github.com/microsoft/vcpkg.git
-          .\vcpkg\bootstrap-vcpkg.bat
+          go mod download
+        shell: msys2 {0}  # 在 MSYS2 环境中执行
 
-          # 安装 libwebp、libavif（自动包含 libaom 依赖）
-          .\vcpkg\vcpkg install libwebp:x64-windows libavif:x64-windows
-
-          # 确认安装路径（vcpkg 会自动处理依赖）
-          echo "vcpkg 安装路径: $PWD/vcpkg"
-          echo "头文件路径: $PWD/vcpkg/installed/x64-windows/include"
-          echo "库文件路径: $PWD/vcpkg/installed/x64-windows/lib"
-        shell: pwsh
+      # 步骤 4：编译 Go 程序（启用 Cgo，使用 MSYS2 的依赖）
+      - name: Build with Cgo (MSYS2)
         env:
-          # 告诉 Cgo 头文件和库文件的位置（vcpkg 安装路径）
-          CGO_CFLAGS: "-I${{ github.workspace }}/vcpkg/installed/x64-windows/include"
-          CGO_LDFLAGS: "-L${{ github.workspace }}/vcpkg/installed/x64-windows/lib"
-      # --------------------------
-      # 编译
-      # --------------------------
-      - name: Build (with Cgo)
+          CGO_ENABLED: 1
+          GOOS: windows
+          GOARCH: amd64
         run: |
-          $outputName = "image2avif-${{ github.ref_name }}-${{ matrix.target }}${{ matrix.suffix }}"
-          $env:CGO_ENABLED = "1"
-          $env:GOOS = "${{ matrix.goos }}"
-          $env:GOARCH = "${{ matrix.goarch }}"
+          # 统一输出文件名，前缀使用 'image2avif'
+          outputName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
+          
+          # 编译（替换 ./main.go 为你的程序入口路径）
           go build -o $outputName ./main.go
-        shell: pwsh
+          
+          # 验证编译产物是否存在
+          if [ -f "$outputName" ]; then
+            echo "编译成功：$outputName"
+          else
+            echo "编译失败：未生成可执行文件"
+            exit 1
+          fi
+        shell: msys2 {0} # 在 MSYS2 环境中执行，以便使用 MinGW GCC 和库
 
-      # --------------------------
-      # 打包并上传
-      # --------------------------
-      - name: Package
+      # 步骤 5：将编译产物打包为 zip
+      - name: Package as zip
         run: |
-          $zipName = "myapp-${{ github.ref_name }}-${{ matrix.target }}.zip"
-          if ($Env:RUNNER_OS -eq "Windows") {
-            7z a $zipName $outputName
-          } else {
-            zip $zipName $outputName
-          }
-        shell: pwsh
+          # 统一压缩文件名
+          exeName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
+          zipName="image2avif-${{ github.ref_name }}-windows-amd64.zip"
+          
+          # 使用 MSYS2 的 zip 命令打包
+          zip $zipName $exeName
+          
+          # 将 zipName 设置为 output，方便后续步骤使用
+          echo "zip_name=$zipName" >> $GITHUB_OUTPUT
+        shell: msys2 {0}
+        id: package
 
+      # 步骤 6：上传到 GitHub Release
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: myapp-${{ github.ref_name }}-${{ matrix.target }}.zip
+          # 上传 Windows 平台的 zip 包，使用 package 步骤的输出
+          files: ${{ steps.package.outputs.zip_name }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GitHub 自动提供的令牌
