@@ -22,20 +22,20 @@ jobs:
         with:
           go-version: 'stable' 
 
-      # 步骤 2：安装 MSYS2 环境和依赖 (移除所有注释)
-      - name: Set up MSYS2 and Dependencies
+      # 步骤 2：安装 MSYS2 环境和依赖 (修复包名)
+      - name: Set up MSYS2 and Dependencies (Fixing Package Names)
         uses: msys2/setup-msys2@v2
         with:
           update: true
           # 确保 MSYS2 继承 Windows 的完整 PATH
           path-type: inherit 
-          # 核心修复：移除所有注释、Emoji 和特殊字符
+          # 🚀 核心修复：更新包名以匹配 MinGW 仓库
           install: >-
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-libwebp
             mingw-w64-x86_64-libavif
-            mingw-w64-x86_64-libaom
-            mingw-w64-x86_64-zip
+            mingw-w64-x86_64-aom  # <-- 修复 libaom 包名
+            zip                   # <-- 使用 MSYS2 基础 zip 工具
             mingw-w64-x86_64-pkg-config
           msystem: MINGW64 
 
@@ -44,13 +44,12 @@ jobs:
         run: go mod download
         shell: msys2 {0} 
 
-      # 步骤 4：编译 Go 程序（启用 Cgo，依赖 PKG_CONFIG 自动查找路径）
+      # 步骤 4：编译 Go 程序（启用 Cgo，依赖 PKG_CONFIG）
       - name: Build with Cgo (MSYS2)
         env:
           CGO_ENABLED: 1
           GOOS: windows
           GOARCH: amd64
-          # 保持 CGO 环境变量为空，依赖 pkg-config 自动设置
           
         run: |
           # 统一输出文件名
@@ -75,6 +74,7 @@ jobs:
           exeName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
           zipName="image2avif-${{ github.ref_name }}-windows-amd64.zip"
           
+          # 使用 MSYS2 的 zip 命令打包
           zip $zipName $exeName
           
           echo "zip_name=$zipName" >> $GITHUB_OUTPUT
