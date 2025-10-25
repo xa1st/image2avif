@@ -1,4 +1,4 @@
-name: Windows Build with MSYS2 (Cgo)
+name: Cross-Platform Build with Cgo (Windows, Linux, macOS)
 
 # 触发条件：推送以 v 开头的 Tag 时触发（如 v1.0.0）
 on:
@@ -7,9 +7,44 @@ on:
       - 'v*'
 
 jobs:
-  build-windows:
-    name: Build Windows (amd64) with MSYS2
-    runs-on: windows-latest  # 使用 Windows 环境
+  build:
+    # 使用矩阵策略定义需要构建的平台
+    strategy:
+      matrix:
+        # 定义操作系统、GoOS、GoARCH、文件后缀和打包工具
+        include:
+          # Windows (amd64) - 需要 MSYS2/MinGW 和 .exe 后缀
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            tool: msys2
+            # MSYS2/MinGW 的包名列表
+            dependencies: mingw-w64-x86_64-gcc mingw-w64-x86_64-libwebp mingw-w64-x86_64-libavif mingw-w64-x86_64-aom zip mingw-w64-x86_64-pkg-config
+            filename_ext: .exe
+            archive_ext: .zip
+          
+          # Linux (amd64) - 使用标准的 apt 包管理器
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            tool: apt
+            # Linux 的包名列表 (通常是 libname-dev 格式)
+            dependencies: build-essential libavif-dev libaom-dev libwebp-dev zip pkg-config
+            filename_ext: "" # Linux 可执行文件没有后缀
+            archive_ext: .tar.gz
+            
+          # macOS (amd64) - 使用 Homebrew
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            tool: brew
+            # macOS/Homebrew 的包名列表
+            dependencies: libavif aom webp pkg-config
+            filename_ext: "" # macOS 可执行文件没有后缀
+            archive_ext: .tar.gz
+
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ${{ matrix.os }}
 
     # 授予创建和上传 Release 所需的权限
     permissions:
@@ -25,69 +60,96 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 'stable' 
+      
+      # ----------------------------------------------------
+      # 步骤 2：安装依赖 (根据不同平台执行不同命令)
+      # ----------------------------------------------------
+      - name: Install dependencies (Linux/macOS)
+        # 仅在非 Windows 平台运行
+        if: matrix.tool != 'msys2'
+        run: |
+          if [ "${{ matrix.tool }}" == "apt" ]; then
+            sudo apt-get update
+            sudo apt-get install -y ${{ matrix.dependencies }}
+          elif [ "${{ matrix.tool }}" == "brew" ]; then
+            brew install ${{ matrix.dependencies }}
+          fi
 
-      # 步骤 2：安装 MSYS2 环境和依赖 (修复包名)
-      - name: Set up MSYS2 and Dependencies (Fixing Package Names)
+      - name: Install dependencies (Windows/MSYS2)
+        # 仅在 Windows 平台运行
+        if: matrix.tool == 'msys2'
         uses: msys2/setup-msys2@v2
         with:
           update: true
-          # 确保 MSYS2 继承 Windows 的完整 PATH
           path-type: inherit 
-          # 🚀 核心修复：更新包名以匹配 MinGW 仓库
-          install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-libwebp
-            mingw-w64-x86_64-libavif
-            mingw-w64-x86_64-aom
-            zip
-            mingw-w64-x86_64-pkg-config
+          install: ${{ matrix.dependencies }}
           msystem: MINGW64
 
       # 步骤 3：下载 Go 依赖
+      # 在 Windows 上使用 msys2 shell，在其他平台上使用默认 shell
       - name: Download Go dependencies
         run: go mod download
-        shell: msys2 {0} 
-
-      # 步骤 4：编译 Go 程序（启用 Cgo，依赖 PKG_CONFIG）
-      - name: Build with Cgo (MSYS2)
+        shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }}
+        
+      # ----------------------------------------------------
+      # 步骤 4：编译 Go 程序
+      # ----------------------------------------------------
+      - name: Build with Cgo
         env:
           CGO_ENABLED: 1
-          GOOS: windows
-          GOARCH: amd64
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          # PKG_CONFIG_PATH 环境变量：Linux/macOS 可能需要，Windows 上依赖 PKG_CONFIG_
+          PKG_CONFIG_PATH: /usr/local/opt/libavif/lib/pkgconfig:/usr/local/opt/aom/lib/pkgconfig # Homebrew 路径
           
         run: |
           # 统一输出文件名
-          outputName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
+          outputName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.filename_ext }}"
           
-          # 编译
-          go build -o $outputName ./main.go
-          
-          # 验证
-          if [ -f "$outputName" ]; then
-            echo "编译成功：$outputName"
-          else
-            echo "编译失败：未生成可执行文件"
-            exit 1
+          # 编译命令 (Windows 的额外 ldflags 和 sysource 仅在 Windows job 中生效)
+          # 注意：在 Linux/macOS 上不需要 -sysource=./resource.syso
+          ldflags="-s -w"
+          if [ "${{ matrix.goos }}" == "windows" ]; then
+            ldflags="${ldflags} -sysource=./resource.syso"
           fi
-        shell: msys2 {0} 
+          
+          go build -o $outputName ./main.go -ldflags="$ldflags"
+          
+          echo "outputName=$outputName" >> $GITHUB_OUTPUT
+        id: build_app
+        # 在 Windows 上使用 msys2 shell，在其他平台上使用默认 shell
+        shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }} 
 
-      # 步骤 5：将编译产物打包为 zip
-      - name: Package as zip
+      # ----------------------------------------------------
+      # 步骤 5：打包
+      # ----------------------------------------------------
+      - name: Package artifact
         id: package
         run: |
-          exeName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
-          zipName="image2avif-${{ github.ref_name }}-windows-amd64.zip"
+          exeName="${{ steps.build_app.outputs.outputName }}"
+          zipName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.archive_ext }}"
           
-          # 使用 MSYS2 的 zip 命令打包
-          zip $zipName $exeName
+          if [ "${{ matrix.archive_ext }}" == ".zip" ]; then
+            zip $zipName $exeName
+          else
+            # 使用 tar.gz 打包 Linux 和 macOS
+            tar -czvf $zipName $exeName
+          fi
           
           echo "zip_name=$zipName" >> $GITHUB_OUTPUT
-        shell: msys2 {0}
+        # 在 Windows 上使用 msys2 shell，在其他平台上使用默认 shell
+        shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }}
 
+      # ----------------------------------------------------
       # 步骤 6：上传到 GitHub Release
+      # ----------------------------------------------------
+      # 使用 artifact-name 来跟踪上传的文件名
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.package.outputs.zip_name }}
+          # 仅在第一个 job (Windows) 完成后创建 Release，后续 job 仅上传文件
+          # 确保每次构建都上传文件，但只在第一个 job 中创建 release
+          prerelease: true # 可选：如果希望作为预发布版本
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
