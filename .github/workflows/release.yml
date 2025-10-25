@@ -30,15 +30,6 @@ jobs:
             dependencies: build-essential libavif-dev libaom-dev libwebp-dev tar zip pkg-config
             filename_ext: "" 
             archive_ext: .tar.gz
-            
-          # macOS (amd64)
-          - os: macos-latest
-            goos: darwin
-            goarch: amd64
-            tool: brew
-            dependencies: libavif aom webp pkg-config
-            filename_ext: "" 
-            archive_ext: .tar.gz
 
     name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
     runs-on: ${{ matrix.os }}
@@ -61,25 +52,11 @@ jobs:
       # ----------------------------------------------------
       # 步骤 2：安装依赖
       # ----------------------------------------------------
-      - name: Install dependencies (Linux/macOS)
+      - name: Install dependencies (Linux)
         if: matrix.tool != 'msys2'
         run: |
-          if [ "${{ matrix.tool }}" == "apt" ]; then
-            sudo apt-get update
-            sudo apt-get install -y ${{ matrix.dependencies }}
-          elif [ "${{ matrix.tool }}" == "brew" ]; then
-            echo "Installing x86_64 dependencies via Homebrew..."
-            arch -x86_64 /usr/local/bin/brew update
-            arch -x86_64 /usr/local/bin/brew install ${{ matrix.dependencies }}
-
-            export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
-            echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-            
-            export C_INCLUDE_PATH="/usr/local/include"
-            export LIBRARY_PATH="/usr/local/lib"
-            echo "C_INCLUDE_PATH=$C_INCLUDE_PATH" >> $GITHUB_ENV
-            echo "LIBRARY_PATH=$LIBRARY_PATH" >> $GITHUB_ENV
-          fi
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.dependencies }}
 
       - name: Install dependencies (Windows/MSYS2)
         if: matrix.tool == 'msys2'
@@ -98,8 +75,8 @@ jobs:
       # 步骤 4：编译 Go 程序
       # ----------------------------------------------------
       
-      # 4a: Build (Linux/macOS)
-      - name: Build (Linux/macOS)
+      # 4a: Build (Linux)
+      - name: Build (Linux)
         if: matrix.tool != 'msys2'
         env:
           CGO_ENABLED: 1
@@ -134,15 +111,15 @@ jobs:
       # 步骤 5：打包 (重构 shell 逻辑)
       # ----------------------------------------------------
       
-      # 5a: Package (Linux/macOS)
-      - name: Package (Linux/macOS)
+      # 5a: Package (Linux)
+      - name: Package (Linux)
         if: matrix.tool != 'msys2'
         id: package_unix
         run: |
           exeName="${{ steps.build_app_unix.outputs.outputName }}"
           zipName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.archive_ext }}"
           
-          # Linux/macOS 使用 tar.gz
+          # Linux 使用 tar.gz
           tar -czvf $zipName $exeName
           
           echo "zip_name=$zipName" >> $GITHUB_OUTPUT
