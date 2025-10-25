@@ -22,20 +22,20 @@ jobs:
         with:
           go-version: 'stable' 
 
-      # 步骤 2：安装 MSYS2 环境和依赖 (核心：添加 pkg-config)
-      - name: Set up MSYS2 and Dependencies (with pkg-config)
+      # 步骤 2：安装 MSYS2 环境和依赖 (移除所有注释)
+      - name: Set up MSYS2 and Dependencies
         uses: msys2/setup-msys2@v2
         with:
           update: true
-          # 强制 MSYS2 继承 Windows 的完整 PATH，确保能找到 Go 命令
+          # 确保 MSYS2 继承 Windows 的完整 PATH
           path-type: inherit 
+          # 核心修复：移除所有注释、Emoji 和特殊字符
           install: >-
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-libwebp
             mingw-w64-x86_64-libavif
             mingw-w64-x86_64-libaom
             mingw-w64-x86_64-zip
-            # 🚀 核心修复：添加 pkg-config，用于自动查找库和头文件路径
             mingw-w64-x86_64-pkg-config
           msystem: MINGW64 
 
@@ -50,11 +50,7 @@ jobs:
           CGO_ENABLED: 1
           GOOS: windows
           GOARCH: amd64
-          
-          # ⚠️ 移除手动设置 CGO_CFLAGS 和 CGO_LDFLAGS！
-          # 我们现在依赖 pkg-config 来自动查找。
-          # CGO_CFLAGS: -I/mingw64/include  <-- REMOVED
-          # CGO_LDFLAGS: -L/mingw64/lib -lavif -laom -lwebp -lm <-- REMOVED
+          # 保持 CGO 环境变量为空，依赖 pkg-config 自动设置
           
         run: |
           # 统一输出文件名
