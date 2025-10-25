@@ -72,7 +72,12 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y ${{ matrix.dependencies }}
           elif [ "${{ matrix.tool }}" == "brew" ]; then
+            # 确保 Homebrew 及其环境是最新的
+            brew update
+            # 安装依赖
             brew install ${{ matrix.dependencies }}
+            # 确保 PKG_CONFIG_PATH 包含 Homebrew 的路径
+            echo "PKG_CONFIG_PATH=$(brew --prefix aom)/lib/pkgconfig:$(brew --prefix libavif)/lib/pkgconfig:${PKG_CONFIG_PATH}" >> $GITHUB_ENV
           fi
 
       - name: Install dependencies (Windows/MSYS2)
@@ -86,10 +91,10 @@ jobs:
           msystem: MINGW64
 
       # 步骤 3：下载 Go 依赖
-      # 在 Windows 上使用 msys2 shell，在其他平台上使用默认 shell
       - name: Download Go dependencies
         run: go mod download
-        shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }}
+        # 🚀 修复：仅在 Windows 平台上使用 msys2 shell
+        shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }} 
         
       # ----------------------------------------------------
       # 步骤 4：编译 Go 程序
@@ -99,16 +104,15 @@ jobs:
           CGO_ENABLED: 1
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          # PKG_CONFIG_PATH 环境变量：Linux/macOS 可能需要，Windows 上依赖 PKG_CONFIG_
-          PKG_CONFIG_PATH: /usr/local/opt/libavif/lib/pkgconfig:/usr/local/opt/aom/lib/pkgconfig # Homebrew 路径
+          # PKG_CONFIG_PATH 已在 macOS 步骤中设置，无需重复
           
         run: |
           # 统一输出文件名
           outputName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.filename_ext }}"
           
-          # 编译命令 (Windows 的额外 ldflags 和 sysource 仅在 Windows job 中生效)
-          # 注意：在 Linux/macOS 上不需要 -sysource=./resource.syso
+          # 编译参数
           ldflags="-s -w"
+          # Windows job 独有的 sysource flag
           if [ "${{ matrix.goos }}" == "windows" ]; then
             ldflags="${ldflags} -sysource=./resource.syso"
           fi
@@ -117,7 +121,7 @@ jobs:
           
           echo "outputName=$outputName" >> $GITHUB_OUTPUT
         id: build_app
-        # 在 Windows 上使用 msys2 shell，在其他平台上使用默认 shell
+        # 🚀 修复：仅在 Windows 平台上使用 msys2 shell
         shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }} 
 
       # ----------------------------------------------------
@@ -130,26 +134,17 @@ jobs:
           zipName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.archive_ext }}"
           
           if [ "${{ matrix.archive_ext }}" == ".zip" ]; then
+            # Windows/Linux zip
             zip $zipName $exeName
           else
-            # 使用 tar.gz 打包 Linux 和 macOS
+            # Linux/macOS tar.gz
             tar -czvf $zipName $exeName
           fi
           
           echo "zip_name=$zipName" >> $GITHUB_OUTPUT
-        # 在 Windows 上使用 msys2 shell，在其他平台上使用默认 shell
+        # 🚀 修复：仅在 Windows 平台上使用 msys2 shell
         shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }}
 
       # ----------------------------------------------------
       # 步骤 6：上传到 GitHub Release
-      # ----------------------------------------------------
-      # 使用 artifact-name 来跟踪上传的文件名
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.package.outputs.zip_name }}
-          # 仅在第一个 job (Windows) 完成后创建 Release，后续 job 仅上传文件
-          # 确保每次构建都上传文件，但只在第一个 job 中创建 release
-          prerelease: true # 可选：如果希望作为预发布版本
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # ----------------
