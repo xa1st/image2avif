@@ -16,38 +16,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 步骤 1.5：设置 Go 环境
+      # ⚠️ 必须在 MSYS2 设置之前或之后，但要确保 Go PATH 被设置。
+      # 建议放在 MSYS2 之前，以便 MSYS2 知道 Go 的路径。
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable' # 替换为你需要的 Go 版本
+
       # 步骤 2：安装 MSYS2 环境和依赖
       - name: Set up MSYS2 and Dependencies
         uses: msys2/setup-msys2@v2
         with:
-          # 更新 MSYS2 包索引
           update: true
-          # 安装所需工具链和依赖（请确认 'image2avif' 应用所需的库是否完整）
-          # 注意：移除了 mingw-w64-x86_64-go，推荐使用 actions/setup-go 设置 Go 环境
+          # 核心修复: 强制 MSYS2 继承 Windows 的完整 PATH 
+          # 这确保了 Go (由 setup-go@v5 设置) 在 msys2 shell 中可以被找到。
+          path-type: inherit 
           pacman: >-
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-libwebp
             mingw-w64-x86_64-libavif
             mingw-w64-x86_64-libaom
-            mingw-w64-x86_64-zip  # 用于打包
-          # 使用 MSYS2 的 bash 作为默认 shell
+            mingw-w64-x86_64-zip
           shell: msys2 {0}
-          # 如果你的 Cgo 代码需要链接特定的库路径，可以设置 path-type
-          # path-type: strict
 
-      # 【可选】步骤 2.5：设置 Go 环境（推荐使用官方 Action，版本可控）
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 'stable' # 替换为你需要的 Go 版本
-        # 注意：这里我们不指定 shell: msys2 {0}，让 Go 在标准 Windows 环境中安装，
-        # 编译时再通过 shell: msys2 {0} 调用
-
-      # 步骤 3：下载 Go 依赖（确保 go.sum 完整）
+      # 步骤 3：下载 Go 依赖（现在 go 命令应该能找到了）
       - name: Download Go dependencies
-        run: |
-          go mod download
-        shell: msys2 {0}  # 在 MSYS2 环境中执行
+        run: go mod download
+        shell: msys2 {0} 
 
       # 步骤 4：编译 Go 程序（启用 Cgo，使用 MSYS2 的依赖）
       - name: Build with Cgo (MSYS2)
@@ -56,25 +52,25 @@ jobs:
           GOOS: windows
           GOARCH: amd64
         run: |
-          # 统一输出文件名，前缀使用 'image2avif'
+          # 统一输出文件名
           outputName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
           
-          # 编译（替换 ./main.go 为你的程序入口路径）
+          # 编译
           go build -o $outputName ./main.go
           
-          # 验证编译产物是否存在
+          # 验证
           if [ -f "$outputName" ]; then
             echo "编译成功：$outputName"
           else
             echo "编译失败：未生成可执行文件"
             exit 1
           fi
-        shell: msys2 {0} # 在 MSYS2 环境中执行，以便使用 MinGW GCC 和库
+        shell: msys2 {0} 
 
       # 步骤 5：将编译产物打包为 zip
       - name: Package as zip
+        id: package # 用于传递文件名到下一步
         run: |
-          # 统一压缩文件名
           exeName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
           zipName="image2avif-${{ github.ref_name }}-windows-amd64.zip"
           
@@ -84,13 +80,11 @@ jobs:
           # 将 zipName 设置为 output，方便后续步骤使用
           echo "zip_name=$zipName" >> $GITHUB_OUTPUT
         shell: msys2 {0}
-        id: package
 
       # 步骤 6：上传到 GitHub Release
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          # 上传 Windows 平台的 zip 包，使用 package 步骤的输出
           files: ${{ steps.package.outputs.zip_name }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GitHub 自动提供的令牌
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
