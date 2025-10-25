@@ -34,10 +34,10 @@ jobs:
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-libwebp
             mingw-w64-x86_64-libavif
-            mingw-w64-x86_64-aom  # <-- 修复 libaom 包名
-            zip                   # <-- 使用 MSYS2 基础 zip 工具
+            mingw-w64-x86_64-aom
+            zip
             mingw-w64-x86_64-pkg-config
-          msystem: MINGW64 
+          msystem: MINGW64
 
       # 步骤 3：下载 Go 依赖
       - name: Download Go dependencies
