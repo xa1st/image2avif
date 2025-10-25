@@ -3,7 +3,7 @@ name: Build with AVIF/WebP (Cgo)
 on:
   push:
     tags:
-      - 'v*'  # 标签触发，如 v1.0.0
+      - 'v*'
 
 jobs:
   build:
@@ -12,19 +12,16 @@ jobs:
     strategy:
       matrix:
         include:
-          # Windows (amd64)
           - os: windows-latest
             target: windows-amd64
             goos: windows
             goarch: amd64
             suffix: .exe
-          # Linux (amd64)
           - os: ubuntu-latest
             target: linux-amd64
             goos: linux
             goarch: amd64
             suffix: ''
-          # macOS (amd64/arm64) - 统一在 macos-latest 编译（支持 Intel 和 M 芯片）
           - os: macos-latest
             target: macos-amd64
             goos: darwin
@@ -43,63 +40,63 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'  # 替换为你的 Go 版本
-          cache: true  # 缓存依赖，加速构建
+          go-version: '1.25'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
 
       # --------------------------
-      # 安装系统依赖（C 库：libavif + libwebp）
+      # 安装系统依赖（补充 libaom 等核心库）
       # --------------------------
       
-      # Linux 系统：通过 apt 安装依赖
+      # Linux 系统：安装 libwebp + libavif + libaom（avif 依赖的编码库）
       - name: Install dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          # 安装 libwebp（webp 库依赖）
+          # 安装 libwebp
           sudo apt-get install -y libwebp-dev
-          # 安装 libavif（avif 库依赖，包含编码/解码）
-          sudo apt-get install -y libavif-dev libavifenc-dev libavifdec-dev
+          # 安装 libavif 及其依赖的编码库（libaom 是核心）
+          sudo apt-get install -y libavif-dev libavifenc-dev libavifdec-dev libaom-dev
 
-      # macOS 系统：通过 brew 安装依赖
+      # macOS 系统：通过 brew 安装（brew 会自动安装 libavif 的依赖）
       - name: Install dependencies (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          # 安装 libwebp
           brew install webp
-          # 安装 libavif
+          # 安装 libavif（brew 会自动拉取 libaom 等依赖）
           brew install libavif
 
-      # Windows 系统：通过 choco 安装依赖（需管理员权限）
+      # Windows 系统：通过 choco 安装 libaom（libavif 的依赖）
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          # 安装 Chocolatey 包管理器（如果未安装）
           if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
             Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
           }
-          # 安装 libwebp 和 libavif（Windows 下的预编译包）
-          choco install -y libwebp libavif
+          # 安装 libwebp、libavif 及其依赖 libaom
+          choco install -y libwebp libavif libaom
         shell: pwsh
         env:
-          # Windows 下需要指定库的安装路径，让 Cgo 找到头文件和库文件
+          # 确保头文件和库文件路径包含 libaom
           CGO_CFLAGS: "-IC:/ProgramData/chocolatey/include"
-          CGO_LDFLAGS: "-LC:/ProgramData/chocolatey/lib/libwebp/lib -LC:/ProgramData/chocolatey/lib/libavif/lib"
+          CGO_LDFLAGS: "-LC:/ProgramData/chocolatey/lib/libwebp/lib -LC:/ProgramData/chocolatey/lib/libavif/lib -LC:/ProgramData/chocolatey/lib/libaom/lib"
 
       # --------------------------
-      # 编译 Go 程序（启用 Cgo）
+      # 编译
       # --------------------------
       - name: Build (with Cgo)
         run: |
           $outputName = "myapp-${{ github.ref_name }}-${{ matrix.target }}${{ matrix.suffix }}"
-          $env:CGO_ENABLED = "1"  # 必须启用 Cgo
+          $env:CGO_ENABLED = "1"
           $env:GOOS = "${{ matrix.goos }}"
           $env:GOARCH = "${{ matrix.goarch }}"
-          # 编译（替换 ./main.go 为你的程序入口）
           go build -o $outputName ./main.go
         shell: pwsh
 
       # --------------------------
-      # 打包并上传到 Release
+      # 打包并上传
       # --------------------------
       - name: Package
         run: |
