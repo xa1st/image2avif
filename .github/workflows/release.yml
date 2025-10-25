@@ -91,12 +91,18 @@ jobs:
       # ----------------------------------------------------
       
       # 4a: Build (Linux/macOS)
+      # 4a: Build (Linux/macOS)
       - name: Build (Linux/macOS)
         if: matrix.tool != 'msys2'
         env:
           CGO_ENABLED: 1
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          # 🚀 核心修复：为 Cgo 明确添加 Homebrew 的标准头文件和库路径
+          C_INCLUDE_PATH: /usr/local/include:/opt/homebrew/include
+          LIBRARY_PATH: /usr/local/lib:/opt/homebrew/lib
+          # 注意：PKG_CONFIG_PATH 已经通过 $GITHUB_ENV 设置，这里可选重复
+          
         run: |
           outputName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.filename_ext }}"
           go build -ldflags="-s -w" -o $outputName ./main.go
