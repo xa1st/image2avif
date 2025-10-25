@@ -18,7 +18,6 @@ jobs:
             goos: windows
             goarch: amd64
             tool: msys2
-            # MSYS2/MinGW 的包名列表
             dependencies: mingw-w64-x86_64-gcc mingw-w64-x86_64-libwebp mingw-w64-x86_64-libavif mingw-w64-x86_64-aom zip mingw-w64-x86_64-pkg-config
             filename_ext: .exe
             archive_ext: .zip
@@ -28,9 +27,8 @@ jobs:
             goos: linux
             goarch: amd64
             tool: apt
-            # Linux 的包名列表 (通常是 libname-dev 格式)
-            dependencies: build-essential libavif-dev libaom-dev libwebp-dev zip pkg-config
-            filename_ext: "" # Linux 可执行文件没有后缀
+            dependencies: build-essential libavif-dev libaom-dev libwebp-dev tar zip pkg-config # 确保 tar 也安装
+            filename_ext: "" 
             archive_ext: .tar.gz
             
           # macOS (amd64) - 使用 Homebrew
@@ -38,9 +36,8 @@ jobs:
             goos: darwin
             goarch: amd64
             tool: brew
-            # macOS/Homebrew 的包名列表
             dependencies: libavif aom webp pkg-config
-            filename_ext: "" # macOS 可执行文件没有后缀
+            filename_ext: "" 
             archive_ext: .tar.gz
 
     name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
@@ -62,26 +59,22 @@ jobs:
           go-version: 'stable' 
       
       # ----------------------------------------------------
-      # 步骤 2：安装依赖 (根据不同平台执行不同命令)
+      # 步骤 2：安装依赖
       # ----------------------------------------------------
       - name: Install dependencies (Linux/macOS)
-        # 仅在非 Windows 平台运行
         if: matrix.tool != 'msys2'
         run: |
           if [ "${{ matrix.tool }}" == "apt" ]; then
             sudo apt-get update
             sudo apt-get install -y ${{ matrix.dependencies }}
           elif [ "${{ matrix.tool }}" == "brew" ]; then
-            # 确保 Homebrew 及其环境是最新的
             brew update
-            # 安装依赖
             brew install ${{ matrix.dependencies }}
             # 确保 PKG_CONFIG_PATH 包含 Homebrew 的路径
             echo "PKG_CONFIG_PATH=$(brew --prefix aom)/lib/pkgconfig:$(brew --prefix libavif)/lib/pkgconfig:${PKG_CONFIG_PATH}" >> $GITHUB_ENV
           fi
 
       - name: Install dependencies (Windows/MSYS2)
-        # 仅在 Windows 平台运行
         if: matrix.tool == 'msys2'
         uses: msys2/setup-msys2@v2
         with:
@@ -91,60 +84,77 @@ jobs:
           msystem: MINGW64
 
       # 步骤 3：下载 Go 依赖
+      # 简单下载，不涉及 Cgo 依赖的路径问题，使用默认 shell
       - name: Download Go dependencies
         run: go mod download
-        # 🚀 修复：仅在 Windows 平台上使用 msys2 shell
-        shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }} 
         
       # ----------------------------------------------------
-      # 步骤 4：编译 Go 程序
+      # 步骤 4：编译 Go 程序 (重构 shell 逻辑)
       # ----------------------------------------------------
-      - name: Build with Cgo
+      
+      # Step 4a: Build (Linux/macOS) - 使用默认 bash shell
+      - name: Build (Linux/macOS)
+        if: matrix.tool != 'msys2'
         env:
           CGO_ENABLED: 1
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          # PKG_CONFIG_PATH 已在 macOS 步骤中设置，无需重复
-          
         run: |
-          # 统一输出文件名
           outputName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.filename_ext }}"
-          
-          # 编译参数
           ldflags="-s -w"
-          # Windows job 独有的 sysource flag
-          if [ "${{ matrix.goos }}" == "windows" ]; then
-            ldflags="${ldflags} -sysource=./resource.syso"
-          fi
-          
           go build -o $outputName ./main.go -ldflags="$ldflags"
-          
           echo "outputName=$outputName" >> $GITHUB_OUTPUT
-        id: build_app
-        # 🚀 修复：仅在 Windows 平台上使用 msys2 shell
-        shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }} 
+        id: build_app_unix
+
+      # Step 4b: Build (Windows) - 显式使用 msys2 shell
+      - name: Build (Windows)
+        if: matrix.tool == 'msys2'
+        env:
+          CGO_ENABLED: 1
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        # 🚀 修复：显式指定 shell，避免复杂表达式
+        shell: msys2 {0} 
+        run: |
+          outputName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.filename_ext }}"
+          ldflags="-s -w -sysource=./resource.syso"
+          go build -o $outputName ./main.go -ldflags="$ldflags"
+          echo "outputName=$outputName" >> $GITHUB_OUTPUT
+        id: build_app_windows
 
       # ----------------------------------------------------
       # 步骤 5：打包
       # ----------------------------------------------------
       - name: Package artifact
         id: package
+        # 使用 if 语句来选择正确的编译产物 ID
         run: |
-          exeName="${{ steps.build_app.outputs.outputName }}"
+          # 确定编译后的文件名
+          if [ "${{ matrix.goos }}" == "windows" ]; then
+            exeName="${{ steps.build_app_windows.outputs.outputName }}"
+          else
+            exeName="${{ steps.build_app_unix.outputs.outputName }}"
+          fi
+
           zipName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.archive_ext }}"
           
           if [ "${{ matrix.archive_ext }}" == ".zip" ]; then
-            # Windows/Linux zip
             zip $zipName $exeName
           else
-            # Linux/macOS tar.gz
             tar -czvf $zipName $exeName
           fi
           
           echo "zip_name=$zipName" >> $GITHUB_OUTPUT
-        # 🚀 修复：仅在 Windows 平台上使用 msys2 shell
-        shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }}
-
+        # 🚀 修复：显式指定 shell，避免复杂表达式
+        shell: ${{ matrix.tool == 'msys2' && 'msys2 {0}' || 'bash' }} 
+        
       # ----------------------------------------------------
       # 步骤 6：上传到 GitHub Release
-      # ----------------
+      # ----------------------------------------------------
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.zip_name }}
+          overwrite: true 
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
