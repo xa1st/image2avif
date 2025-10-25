@@ -11,6 +11,10 @@ jobs:
     name: Build Windows (amd64) with MSYS2
     runs-on: windows-latest  # 使用 Windows 环境
 
+    # 授予创建和上传 Release 所需的权限
+    permissions:
+      contents: write 
+
     steps:
       # 步骤 1：拉取代码
       - name: Checkout code
