@@ -99,8 +99,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           outputName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.filename_ext }}"
-          ldflags="-ldflags=-s -w" 
-          go build -o $outputName ./main.go "$ldflags"
+          go build -ldflags="-s -w" -o $outputName ./main.go
           echo "outputName=$outputName" >> $GITHUB_OUTPUT
         id: build_app_unix
 
@@ -114,8 +113,7 @@ jobs:
         shell: msys2 {0} 
         run: |
           outputName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.filename_ext }}"
-          ldflags="-ldflags=-s -w -sysource=./resource.syso"
-          go build -o $outputName ./main.go "$ldflags"
+          go build -ldflags="-s -w -sysource=./resource.syso" -o $outputName ./main.go
           echo "outputName=$outputName" >> $GITHUB_OUTPUT
         id: build_app_windows
 
