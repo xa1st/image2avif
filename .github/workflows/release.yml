@@ -22,35 +22,40 @@ jobs:
         with:
           go-version: 'stable' 
 
-      # 步骤 2：安装 MSYS2 环境和依赖
-      - name: Set up MSYS2 and Dependencies
+      # 步骤 2：安装 MSYS2 环境和依赖 (核心：添加 pkg-config)
+      - name: Set up MSYS2 and Dependencies (with pkg-config)
         uses: msys2/setup-msys2@v2
         with:
           update: true
           # 强制 MSYS2 继承 Windows 的完整 PATH，确保能找到 Go 命令
           path-type: inherit 
-          pacman: >-
+          install: >-
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-libwebp
             mingw-w64-x86_64-libavif
             mingw-w64-x86_64-libaom
             mingw-w64-x86_64-zip
-          shell: msys2 {0}
+            # 🚀 核心修复：添加 pkg-config，用于自动查找库和头文件路径
+            mingw-w64-x86_64-pkg-config
+          msystem: MINGW64 
 
       # 步骤 3：下载 Go 依赖
       - name: Download Go dependencies
         run: go mod download
         shell: msys2 {0} 
 
-      # 步骤 4：编译 Go 程序（启用 Cgo，使用 MSYS2 的依赖）
+      # 步骤 4：编译 Go 程序（启用 Cgo，依赖 PKG_CONFIG 自动查找路径）
       - name: Build with Cgo (MSYS2)
         env:
           CGO_ENABLED: 1
           GOOS: windows
           GOARCH: amd64
-          # 核心修复: 设置 CGO 编译和链接参数，指向 MinGW64 的库路径
-          CGO_CFLAGS: -I/mingw64/include 
-          CGO_LDFLAGS: -L/mingw64/lib -lavif -laom -lwebp -lm
+          
+          # ⚠️ 移除手动设置 CGO_CFLAGS 和 CGO_LDFLAGS！
+          # 我们现在依赖 pkg-config 来自动查找。
+          # CGO_CFLAGS: -I/mingw64/include  <-- REMOVED
+          # CGO_LDFLAGS: -L/mingw64/lib -lavif -laom -lwebp -lm <-- REMOVED
+          
         run: |
           # 统一输出文件名
           outputName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
