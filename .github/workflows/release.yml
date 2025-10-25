@@ -103,7 +103,7 @@ jobs:
         shell: msys2 {0} 
         run: |
           outputName="image2avif-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.filename_ext }}"
-          go build -ldflags="-s -w -sysource=./resource.syso" -o $outputName ./main.go
+          go build -ldflags="-s -w" -o $outputName ./main.go
           echo "outputName=$outputName" >> $GITHUB_OUTPUT
         id: build_app_windows
 
