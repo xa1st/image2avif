@@ -68,9 +68,17 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y ${{ matrix.dependencies }}
           elif [ "${{ matrix.tool }}" == "brew" ]; then
-            brew update
-            brew install ${{ matrix.dependencies }}
-            echo "PKG_CONFIG_PATH=$(brew --prefix aom)/lib/pkgconfig:$(brew --prefix libavif)/lib/pkgconfig:${PKG_CONFIG_PATH}" >> $GITHUB_ENV
+            echo "Installing x86_64 dependencies via Homebrew..."
+            arch -x86_64 /usr/local/bin/brew update
+            arch -x86_64 /usr/local/bin/brew install ${{ matrix.dependencies }}
+
+            export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
+            echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+            
+            export C_INCLUDE_PATH="/usr/local/include"
+            export LIBRARY_PATH="/usr/local/lib"
+            echo "C_INCLUDE_PATH=$C_INCLUDE_PATH" >> $GITHUB_ENV
+            echo "LIBRARY_PATH=$LIBRARY_PATH" >> $GITHUB_ENV
           fi
 
       - name: Install dependencies (Windows/MSYS2)
@@ -90,7 +98,6 @@ jobs:
       # 步骤 4：编译 Go 程序
       # ----------------------------------------------------
       
-      # 4a: Build (Linux/macOS)
       # 4a: Build (Linux/macOS)
       - name: Build (Linux/macOS)
         if: matrix.tool != 'msys2'
