@@ -17,20 +17,17 @@ jobs:
         uses: actions/checkout@v4
 
       # 步骤 1.5：设置 Go 环境
-      # ⚠️ 必须在 MSYS2 设置之前或之后，但要确保 Go PATH 被设置。
-      # 建议放在 MSYS2 之前，以便 MSYS2 知道 Go 的路径。
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable' # 替换为你需要的 Go 版本
+          go-version: 'stable' 
 
       # 步骤 2：安装 MSYS2 环境和依赖
       - name: Set up MSYS2 and Dependencies
         uses: msys2/setup-msys2@v2
         with:
           update: true
-          # 核心修复: 强制 MSYS2 继承 Windows 的完整 PATH 
-          # 这确保了 Go (由 setup-go@v5 设置) 在 msys2 shell 中可以被找到。
+          # 强制 MSYS2 继承 Windows 的完整 PATH，确保能找到 Go 命令
           path-type: inherit 
           pacman: >-
             mingw-w64-x86_64-gcc
@@ -40,7 +37,7 @@ jobs:
             mingw-w64-x86_64-zip
           shell: msys2 {0}
 
-      # 步骤 3：下载 Go 依赖（现在 go 命令应该能找到了）
+      # 步骤 3：下载 Go 依赖
       - name: Download Go dependencies
         run: go mod download
         shell: msys2 {0} 
@@ -51,6 +48,9 @@ jobs:
           CGO_ENABLED: 1
           GOOS: windows
           GOARCH: amd64
+          # 核心修复: 设置 CGO 编译和链接参数，指向 MinGW64 的库路径
+          CGO_CFLAGS: -I/mingw64/include 
+          CGO_LDFLAGS: -L/mingw64/lib -lavif -laom -lwebp -lm
         run: |
           # 统一输出文件名
           outputName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
@@ -69,15 +69,13 @@ jobs:
 
       # 步骤 5：将编译产物打包为 zip
       - name: Package as zip
-        id: package # 用于传递文件名到下一步
+        id: package
         run: |
           exeName="image2avif-${{ github.ref_name }}-windows-amd64.exe"
           zipName="image2avif-${{ github.ref_name }}-windows-amd64.zip"
           
-          # 使用 MSYS2 的 zip 命令打包
           zip $zipName $exeName
           
-          # 将 zipName 设置为 output，方便后续步骤使用
           echo "zip_name=$zipName" >> $GITHUB_OUTPUT
         shell: msys2 {0}
 
