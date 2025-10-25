@@ -39,17 +39,22 @@ jobs:
       - name: Install dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-            Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-          }
-          # 安装 libwebp、libavif 及其依赖 libaom
-          choco install -y libwebp libavif libaom
+          # 安装 vcpkg（C++ 包管理器）
+          git clone https://github.com/microsoft/vcpkg.git
+          .\vcpkg\bootstrap-vcpkg.bat
+
+          # 安装 libwebp、libavif（自动包含 libaom 依赖）
+          .\vcpkg\vcpkg install libwebp:x64-windows libavif:x64-windows
+
+          # 确认安装路径（vcpkg 会自动处理依赖）
+          echo "vcpkg 安装路径: $PWD/vcpkg"
+          echo "头文件路径: $PWD/vcpkg/installed/x64-windows/include"
+          echo "库文件路径: $PWD/vcpkg/installed/x64-windows/lib"
         shell: pwsh
         env:
-          # 确保头文件和库文件路径包含 libaom
-          CGO_CFLAGS: "-IC:/ProgramData/chocolatey/include"
-          CGO_LDFLAGS: "-LC:/ProgramData/chocolatey/lib/libwebp/lib -LC:/ProgramData/chocolatey/lib/libavif/lib -LC:/ProgramData/chocolatey/lib/libaom/lib"
-
+          # 告诉 Cgo 头文件和库文件的位置（vcpkg 安装路径）
+          CGO_CFLAGS: "-I${{ github.workspace }}/vcpkg/installed/x64-windows/include"
+          CGO_LDFLAGS: "-L${{ github.workspace }}/vcpkg/installed/x64-windows/lib"
       # --------------------------
       # 编译
       # --------------------------
