@@ -1,130 +1,125 @@
-# 图片转AVIF工具 (Go语言版)
+# 图片转AVIF工具 (image2avif) 🖼️
 
-一个使用Go语言开发的简单易用的命令行工具，用于将常见图片格式转换为AVIF格式。
+![Go Language](https://img.shields.io/badge/language-Go-blue?style=flat-square&logo=go)
+![Apache 2.0 License](https://img.shields.io/badge/Apache%202.0-Source-green)
+[![GitHub stars](https://img.shields.io/github/stars/xa1st/image2avif.svg?label=Stars&style=flat-square)](https://github.com/xa1st/image2avif)
+[![GitHub forks](https://img.shields.io/github/forks/xa1st/image2avif.svg?label=Fork&style=flat-square)](https://github.com/xa1st/image2avif)
+[![GitHub issues](https://img.shields.io/github/issues/xa1st/image2avif.svg?label=Issue&style=flat-square)](https://github.com/xa1st/image2avif/issues)
+![](https://changkun.de/urlstat?mode=github&repo=xa1st/image2avif)
+[![license](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](https://github.com/xa1st/image2avif/blob/master/LICENSE)
 
-## 功能特点
+一款基于**Go语言**开发的高效命令行工具，专注于将主流图片格式快速转换为AVIF格式，兼顾压缩效率与图像质量，支持批量处理与并发转换。
 
-- 支持多种图片格式转换为AVIF
-- 可调节AVIF质量参数
-- 批量转换支持
-- 简单的命令行界面
+## ✨ 核心特性
 
-## 支持的输入格式
+| 特性                | 说明                                      |
+| ----------------- | --------------------------------------- |
+| 🎨 **多格式支持**      | 完美兼容 PNG、BMP、JPG/JPEG、WebP、GIF 等主流图像格式 |
+| 🚀 **并发转换**      | 自动利用CPU多核性能，并行处理多个文件，大幅提升转换效率    |
+| 🔧 **质量可调**      | 支持 1-100 级质量参数调节，平衡文件大小与图像质量      |
+| 📦 **批量处理**      | 支持通配符匹配（如 `*.png`），一键转换多个多个文件        |
+| ⚡ **强制覆盖**      | 可选强制覆盖已存在的AVIF文件，灵活处理重复转换场景      |
+| 🖥️ **跨平台兼容**    | 支持 Linux、macOS、Windows 系统，无需图形界面        |
 
-- PNG (.png)
-- BMP (.bmp)
-- GIF (.png)
-- JPG (.jpg, .jpeg)
-- WebP (.webp)
+## 🚀 快速开始
 
-## 安装说明
+### 🔍 前提条件
 
-### 前提条件
+- 无需安装Go环境，直接使用预编译可执行文件
+- 操作系统：Linux（任意终端）、macOS（Terminal/iTerm2）、Windows（PowerShell/CMD）
 
-- 无需安装Go语言环境（工具已预编译为可执行文件）
+### 🛠️ 安装与验证
 
-### 安装步骤
+1. **下载可执行文件**
 
-1. **下载dist下的可执行文件**
+   从项目发布页下载对应系统的预编译版本，保存到本地目录。
 
-2. **将工具目录添加到系统PATH环境变量**
-   - 右键点击"此电脑" → "属性" → "高级系统设置" → "环境变量"
-   - 在"系统变量"中找到"Path" → 点击"编辑"
-   - 点击"新建" → 输入工具所在目录的完整路径
-   - 点击"确定"保存更改
+2. **配置环境变量（可选）**
+
+   将工具所在目录添加到系统PATH，实现全局调用。
 
 3. **验证安装**
-   打开新的命令提示符窗口，输入：
+
    ```bash
-   image2avif --version
+   image2avif -v
    ```
-   如果显示版本信息，则安装成功。
 
-## 使用方法
+   若显示版本信息（如 `图片转AVIF工具: 1.2.0`），则安装成功。
 
-### 基本用法
+## 📖 使用指南
+
+### 基本语法
 
 ```bash
-image2avif <图片文件>
+image2avif [选项] <文件路径...>
 ```
 
-### 示例
+### 示例用法
 
-1. **转换单个文件**
-   ```bash
-   image2avif image.jpg
-   ```
-   这将在同一目录下生成`image.avif`文件。
+| 场景                | 命令示例                                  | 说明                     |
+| ----------------- | ------------------------------------- | ---------------------- |
+| 转换单个文件           | `image2avif photo.jpg`                | 在同目录生成 `photo.avif` |
+| 指定质量转换           | `image2avif -q 90 picture.png`        | 以质量90转换PNG文件        |
+| 批量转换多种格式         | `image2avif *.jpg *.png`              | 转换当前目录所有JPG和PNG文件 |
+| 强制覆盖已存在文件        | `image2avif -f -q 70 oldimage.webp`   | 强制覆盖现有AVIF文件       |
+| 转换特定目录文件         | `image2avif ~/Pictures/*.gif`         | 转换 Pictures 目录下所有GIF |
 
-2. **转换多个文件质量**
-   ```bash
-   image2avif -q 90 photo.png
-   ```
-   使用质量参数（1-100，默认80）。
+### 🧰 命令行参数说明
 
-3. **批量转换**
-   ```bash
-   image2avif *.png *.jpg
-   ```
-   转换当前目录下所有PNG和JPG文件。
+| 参数         | 简写   | 类型      | 说明                                  |
+| ---------- | ---- | ------- | ----------------------------------- |
+| `--quality` | `-q` | 数字（1-100） | 可选：设置AVIF图像质量（默认80，数值越高质量越好）   |
+| `--force`   | `-f` | 开关      | 可选：强制覆盖已存在的AVIF输出文件              |
+| `--help`    | `-h` | 开关      | 可选：显示完整帮助信息                      |
+| `--version` | `-v` | 开关      | 可选：显示当前工具版本（如 v1.2.0）           |
 
-4. **拖放使用**
-   将图片文件拖放到到`image2avif`文件上，自动转换为AVIF格式。
+## 🛠️ 编译指南（开发者）
 
-### 命令行选项
+如需自行编译源码，需先安装依赖库：
 
-- `-q <数值>`: 设置AVIF质量 (1-100, 默认: 80)
-- `-v`: 显示版本信息
-- `-h`: 显示帮助信息
+### 环境准备
 
-## 注意事项
+| 操作系统   | 依赖安装命令                                  |
+| ------ | --------------------------------------- |
+| macOS  | `brew install libavif aom`              |
+| Debian/Ubuntu | `apt-get install libavif-dev libaom-dev` |
+| Windows | 使用 [MSYS2](https://www.msys2.org/) 执行：<br>`pacman -S mingw-w64-x86_64-libavif mingw-w64-x86_64-aom` |
 
-1. 转换后的文件将保存在原文件的同一目录下，文件名相同，扩展名为`.avif`。
-
-2. 如果目标文件已存在，转换将失败，不会覆盖现有文件。
-
-3. 转换质量越高，生成的文件越大，但图像质量更好。
-
-## 性能提示
-
-- Go语言版本通常比Node.js版本运行更快，占用内存更少
-- 对于大量文件转换，可以分批进行，避免占用过多系统资源
-- 质量参数设置为80通常是一个很好的平衡点，提供良好的压缩率和图像质量
-
-## 编译使用
-
-要用到cgo，请确保已安装gcc和libavif库。
-
-### MACOS
+### 编译步骤
 
 ```bash
-brew install libavif aom
-```
-### Debian/Ubuntu (使用 apt):
+# 克隆仓库（假设）
+git clone https://github.com/xa1st/image2avif.git
+cd image2avif
 
-```bash
-apt-get install libavif-dev libaom-dev
-```
-
-### Windows 请使用
-
-[MSYS2](https://www.msys2.org/)
-
-```bash
-pacman -Syu
-pacman -S mingw-w64-x86_64-libavif mingw-w64-x86_64-aom
-go build
+# 编译可执行文件
+go build -o image2avif
 ```
 
-### 已知错误
+## ⚠️ 常见问题
 
-   1. 找不到 libaom.dll，以下方法3选1即可
+1. **Windows系统提示缺少 libaom.dll**
+   - 下载 [libaom.dll](https://github.com/xa1st/image2avif/raw/refs/heads/main/dll/libaom.dll)
+   - 放置于工具同目录或系统 `System32` 目录
 
-      请点击此处下载：[libaom.dll](https://github.com/xa1st/image2avif/raw/refs/heads/main/dll/libaom.dll)
+2. **转换失败提示不支持的格式**
+   - 检查文件扩展名是否正确（如 `.jpeg` 而非 `.jpe`）
+   - 确认文件是否为工具支持的格式（PNG/BMP/JPG/WebP/GIF）
 
-      如果想自行打包编译，请访问：https://aomedia.googlesource.com/aom
+3. **大文件转换耗时过长**
+   - 可降低质量参数（如 `-q 60`）
+   - 减少并发处理的文件数量
 
-      也可以在[msys2](https://www.msys2.org/)中使用pacman安装libaom-dev
+## 🧩 技术栈说明
 
-## 许可证
-APACHE2.0
+| 功能模块       | 依赖库           | 作用说明                          |
+| ---------- | ------------- | ----------------------------- |
+| AVIF编码    | `github.com/Kagami/go-avif` | 核心AVIF格式编码实现               |
+| 多格式解码    | 标准库`image`系列 + `webp` | 支持PNG/JPG/GIF等格式的图像解码      |
+| 命令行参数解析  | 标准库`flag`     | 处理用户输入的命令行选项与参数        |
+| 并发控制      | 标准库`sync`     | 基于CPU核心数限制并发goroutine数量   |
+| 文件路径处理    | 标准库`filepath` | 处理通配符匹配、路径解析与输出文件生成  |
+
+## 📄 许可证
+
+本项目基于 **Apache License 2.0** 开源，详见 [LICENSE](LICENSE) 文件。
