@@ -118,11 +118,13 @@ go build
 
 ### 已知错误
 
-1. 找不到 libaom.dll
+   1. 找不到 libaom.dll，以下方法3选1即可
 
-请点击此处下载：[libaom.dll](https://github.com/xa1st/mddplayer/blob/main/dll/libaom.dll)
+      请点击此处下载：[libaom.dll](https://github.com/xa1st/image2avif/raw/refs/heads/main/dll/libaom.dll)
 
-如果想自行打包编译，请访问：https://aomedia.googlesource.com/aom
+      如果想自行打包编译，请访问：https://aomedia.googlesource.com/aom
+
+      也可以在[msys2](https://www.msys2.org/)中使用pacman安装libaom-dev
 
 ## 许可证
 APACHE2.0
