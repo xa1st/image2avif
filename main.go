@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +20,7 @@ import (
 	"golang.org/x/image/bmp"
 )
 
-const version = "1.1.0" // 应用版本号
+const version = "1.2.0" // 应用版本号
 
 var (
 	qualite     int  // 图像质量
@@ -84,8 +85,10 @@ func main() {
 func processFiles(files []string, quality int) {
 	// 启用协程处理文件
 	var wg sync.WaitGroup
+	// 获取CPU核心数
+	var maxGoroutines = runtime.NumCPU()
 	// 限制并发数
-	var sem = make(chan bool, 4)
+	var sem = make(chan bool, maxGoroutines)
 	// 总结果数
 	resultCount := 0
 	// 成功转换数
@@ -268,9 +271,6 @@ func encodeAVIF(img image.Image, w io.Writer, quality int) error {
 		Quality: 63 - avifQuality, // 转换为avif库的质量范围
 		Speed:   4,                // 默认速度
 	}
-
-	fmt.Println("正在编码为AVIF，质量:", quality, Options.Quality)
-
 	// 使用指定选项进行编码
 	return avif.Encode(w, img, &Options)
 }

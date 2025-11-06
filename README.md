@@ -116,6 +116,13 @@ pacman -S mingw-w64-x86_64-libavif mingw-w64-x86_64-aom
 go build
 ```
 
-## 许可证
+### 已知错误
 
-MIT
+1. 找不到 libaom.dll
+
+请点击此处下载：[libaom.dll](https://github.com/xa1st/mddplayer/blob/main/dll/libaom.dll)
+
+如果想自行打包编译，请访问：https://aomedia.googlesource.com/aom
+
+## 许可证
+APACHE2.0
