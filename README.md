@@ -1,4 +1,4 @@
-# 图片转AVIF工具 (image2avif) 🖼️
+# 图片转AVIF工具 (image2avif) 
 
 ![Go Language](https://img.shields.io/badge/language-Go-blue?style=flat-square&logo=go)
 ![Apache 2.0 License](https://img.shields.io/badge/Apache%202.0-Source-green)
@@ -9,6 +9,9 @@
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](https://github.com/xa1st/image2avif/blob/master/LICENSE)
 
 一款基于**Go语言**开发的高效命令行工具，专注于将主流图片格式快速转换为AVIF格式，兼顾压缩效率与图像质量，支持批量处理与并发转换。
+
+## 🎉 当前版本
+1.3.0 (20251107)
 
 ## ✨ 核心特性
 
